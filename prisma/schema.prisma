@@ -1,0 +1,121 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  users        User[]
+  repositories Repository[]
+  integrations Integration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id           String @id @default(cuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  name         String
+  email        String @unique
+  passwordHash String
+  role         String @default("viewer") // 'admin' | 'editor' | 'viewer'
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Repository {
+  id           String @id @default(cuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  owner             String
+  name              String
+  encryptedPat      String  // AES-256-GCM encrypted
+  lastSyncedAt      DateTime?
+
+  pullRequests PullRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, owner, name])
+}
+
+model PullRequest {
+  id           String @id @default(cuid())
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  number        Int
+  title         String
+  author        String
+  filesChanged  Int
+  linesAdded    Int
+  linesDeleted  Int
+  mergedAt      DateTime?
+  openedAt      DateTime
+  minutesToMerge Int?
+
+  usageRecord UsageRecord?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([repositoryId, number])
+}
+
+model Integration {
+  id           String @id @default(cuid())
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  provider         String // 'openai' | 'anthropic' | 'copilot'
+  encryptedApiKey  String // AES-256-GCM encrypted
+
+  lastVerifiedAt   DateTime?
+  isActive         Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, provider])
+}
+
+model UsageRecord {
+  id            String @id @default(cuid())
+  pullRequestId String @unique
+  pullRequest   PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+
+  provider           String @default("openai")   // 'openai' | 'anthropic' | 'github'
+  model              String   // 'gpt-4o' | 'claude-3-5-sonnet' | 'copilot-gpt-4'
+  inputTokens        Int
+  outputTokens       Int
+  cachedInputTokens  Int
+  costUsd            Float    // Estimated cost from PR metadata
+
+  // Actual cost/usage from OpenAI API (optional, for verification)
+  actualCostUsd      Float?
+  actualInputTokens  Int?
+  actualOutputTokens Int?
+
+  // Insights
+  insights           String?  // AI-generated summary of model effectiveness
+
+  generatedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
