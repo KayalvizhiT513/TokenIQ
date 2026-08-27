@@ -1,6 +1,6 @@
 export interface UsageEntry {
-  provider: 'openai' | 'anthropic' | 'github'
-  model: 'gpt-4o' | 'gpt-4o-mini' | 'claude-3-5-sonnet' | 'claude-3-opus' | 'copilot-gpt-4'
+  provider: string
+  model: string
   inputTokens: number
   outputTokens: number
   cachedInputTokens: number
@@ -12,25 +12,16 @@ interface PRMetadata {
   linesDeleted: number
 }
 
-const MODEL_THRESHOLD_LINES = 300
-
-// OpenAI pricing as of June 2026 (per 1k tokens)
-const PRICING = {
-  'gpt-4o': {
-    input: 0.0025,
-    output: 0.01,
-    cached: 0.00125,
-  },
-  'gpt-4o-mini': {
-    input: 0.00015,
-    output: 0.0006,
-    cached: 0.000075,
-  },
+export interface ModelPricing {
+  provider: string
+  model: string
+  inputCostPerMillion: number
+  outputCostPerMillion: number
+  cachedCostPerMillion: number
 }
 
-export function deriveUsage(pr: PRMetadata): UsageEntry {
+export function deriveUsage(pr: PRMetadata, modelConfig: ModelPricing): UsageEntry {
   const linesChanged = pr.linesAdded + pr.linesDeleted
-  const model = linesChanged > MODEL_THRESHOLD_LINES ? 'gpt-4o' : 'gpt-4o-mini'
 
   // Estimate tokens based on lines changed
   // ~8 tokens per line of context
@@ -40,15 +31,14 @@ export function deriveUsage(pr: PRMetadata): UsageEntry {
   // 30% cache hit rate
   const cachedInputTokens = Math.round(inputTokens * 0.3)
 
-  const pricing = PRICING[model]
   const costUsd =
-    (inputTokens / 1000) * pricing.input +
-    (outputTokens / 1000) * pricing.output +
-    (cachedInputTokens / 1000) * pricing.cached
+    (inputTokens / 1_000_000) * modelConfig.inputCostPerMillion +
+    (outputTokens / 1_000_000) * modelConfig.outputCostPerMillion +
+    (cachedInputTokens / 1_000_000) * modelConfig.cachedCostPerMillion
 
   return {
-    provider: 'openai',
-    model,
+    provider: modelConfig.provider,
+    model: modelConfig.model,
     inputTokens,
     outputTokens,
     cachedInputTokens,

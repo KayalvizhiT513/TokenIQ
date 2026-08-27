@@ -16,15 +16,27 @@ export async function POST(req: NextRequest) {
     }
 
     // Get the repository
-    const repo = await prisma.repository.findUnique({
-      where: { id: repoId },
-    })
+    const repo = await prisma.repository.findUnique({ where: { id: repoId }, include: { modelConfig: true } })
 
     if (!repo) {
       return NextResponse.json(
         { error: 'Repository not found' },
         { status: 404 }
       )
+    }
+
+    if (!repo.encryptedPat) {
+      return NextResponse.json(
+        { error: 'This is a demo repository with generated data. Remove it or connect the repository with a GitHub PAT before syncing.' },
+        { status: 400 }
+      )
+    }
+
+    const modelConfig = repo.modelConfig ?? await prisma.modelConfig.findFirst({
+      where: { orgId: repo.orgId, isActive: true }, orderBy: { isDefault: 'desc' },
+    })
+    if (!modelConfig) {
+      return NextResponse.json({ error: 'Add an active model in Model Analysis before syncing a repository.' }, { status: 400 })
     }
 
     // Decrypt the PAT
@@ -56,7 +68,7 @@ export async function POST(req: NextRequest) {
       const usage = deriveUsage({
         linesAdded: pr.linesAdded,
         linesDeleted: pr.linesDeleted,
-      })
+      }, modelConfig)
       return usage
     })
 

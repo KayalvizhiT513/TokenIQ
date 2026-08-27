@@ -19,6 +19,7 @@ model Organization {
   users        User[]
   repositories Repository[]
   integrations Integration[]
+  modelConfigs ModelConfig[]
   usageEvents  UsageEvent[]
 
   createdAt DateTime @default(now())
@@ -47,6 +48,8 @@ model Repository {
   owner             String
   name              String
   encryptedPat      String  // AES-256-GCM encrypted
+  modelConfigId     String?
+  modelConfig       ModelConfig? @relation(fields: [modelConfigId], references: [id], onDelete: SetNull)
   lastSyncedAt      DateTime?
 
   pullRequests PullRequest[]
@@ -55,6 +58,25 @@ model Repository {
   updatedAt DateTime @updatedAt
 
   @@unique([orgId, owner, name])
+}
+
+model ModelConfig {
+  id                 String @id @default(cuid())
+  orgId              String
+  organization       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  provider           String
+  model              String
+  inputCostPerMillion Float
+  outputCostPerMillion Float
+  cachedCostPerMillion Float @default(0)
+  isDefault          Boolean @default(false)
+  isActive           Boolean @default(true)
+  repositories       Repository[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([orgId, provider, model])
+  @@index([orgId, isActive])
 }
 
 model PullRequest {
