@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw, Trash2 } from 'lucide-react'
 
 interface Repo {
   id: string
@@ -19,29 +19,57 @@ interface Repo {
   name: string
   lastSyncedAt: string | null
   prCount: number
+  isDemo: boolean
 }
+
+interface ModelConfig { id: string; provider: string; model: string; isDefault: boolean }
 
 export default function RepositoriesPage() {
   const [isOpen, setIsOpen] = useState(false)
   const [repoUrl, setRepoUrl] = useState('')
   const [pat, setPat] = useState('')
+  const [modelConfigId, setModelConfigId] = useState('')
+  const [models, setModels] = useState<ModelConfig[]>([])
   const [repositories, setRepositories] = useState<Repo[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [syncing, setSyncing] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
 
   useEffect(() => {
     loadRepos()
   }, [])
 
-  const loadRepos = async () => {
+  async function loadRepos() {
     try {
       const res = await fetch('/api/repositories')
       const data = await res.json()
+      if (!res.ok || !Array.isArray(data)) {
+        setRepositories([])
+        setLoadError(data.error || 'Unable to load repositories. Please sign in again.')
+        return
+      }
       setRepositories(data)
+      setLoadError(null)
     } catch (err) {
       console.error('Failed to load repos:', err)
+      setLoadError('Unable to load repositories. Please try again.')
     }
   }
+
+  useEffect(() => {
+    fetch('/api/model-configs')
+      .then(async res => ({ ok: res.ok, data: await res.json() }))
+      .then(({ ok, data }) => {
+        if (!ok || !Array.isArray(data)) {
+          setModels([])
+          return
+        }
+        setModels(data)
+        setModelConfigId(data.find((item: ModelConfig) => item.isDefault)?.id ?? data[0]?.id ?? '')
+      })
+      .catch(() => setModels([]))
+  }, [])
 
   const handleConnect = async () => {
     if (!repoUrl || !pat) {
@@ -75,6 +103,7 @@ export default function RepositoriesPage() {
           owner,
           name,
           pat,
+          modelConfigId,
           orgId: 'demo-org',
         }),
       })
@@ -123,6 +152,35 @@ export default function RepositoriesPage() {
     }
   }
 
+  const handleRemove = async (repo: Repo) => {
+    const confirmed = window.confirm(
+      `Remove ${repo.owner}/${repo.name}? This also removes its ${repo.prCount} analyzed PRs and usage records.`,
+    )
+    if (!confirmed) return
+
+    setRemoving(repo.id)
+    try {
+      const res = await fetch('/api/repositories', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoId: repo.id }),
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        alert(`Failed: ${error.error}`)
+        return
+      }
+
+      setRepositories(current => current.filter(item => item.id !== repo.id))
+    } catch (err) {
+      console.error('Remove error:', err)
+      alert('Error removing repository')
+    } finally {
+      setRemoving(null)
+    }
+  }
+
   return (
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
@@ -153,6 +211,13 @@ export default function RepositoriesPage() {
                   onChange={(e) => setRepoUrl(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Model for estimates</label>
+                <select value={modelConfigId} onChange={(e) => setModelConfigId(e.target.value)} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm" disabled={models.length === 0}>
+                  {models.map(model => <option key={model.id} value={model.id}>{model.provider} · {model.model}{model.isDefault ? ' (default)' : ''}</option>)}
+                </select>
+                {models.length === 0 && <p className="text-xs text-amber-700">No models are configured yet.</p>}
+              </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">GitHub PAT</label>
@@ -177,6 +242,8 @@ export default function RepositoriesPage() {
 
       {/* Connected Repositories */}
       <div className="space-y-4">
+        {loadError && <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{loadError}</div>}
+        {!loadError && repositories.length === 0 && <div className="rounded-lg border border-dashed border-slate-300 p-6 text-sm text-slate-600">No repositories connected yet. Connect one above to begin analyzing pull requests.</div>}
         {repositories.map((repo) => (
           <Card key={repo.id}>
             <CardHeader className="pb-3">
@@ -189,35 +256,49 @@ export default function RepositoriesPage() {
                     {repo.prCount} PRs analyzed
                   </p>
                 </div>
-                <Badge>Active</Badge>
+                <Badge>{repo.isDemo ? 'Demo data' : 'Active'}</Badge>
               </div>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-600">
-                  Last synced:{' '}
-                  {repo.lastSyncedAt
-                    ? new Date(repo.lastSyncedAt).toLocaleDateString()
-                    : 'Never'}{' '}
-                  {repo.lastSyncedAt && 'at'}{' '}
-                  {repo.lastSyncedAt && new Date(repo.lastSyncedAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={(e: any) => {
-                    e.preventDefault()
-                    handleSync(repo.id)
-                  }}
-                  disabled={syncing === repo.id}
-                >
-                  <RefreshCw className={`w-4 h-4 ${syncing === repo.id ? 'animate-spin' : ''}`} />
-                  {syncing === repo.id ? 'Syncing...' : 'Sync Now'}
-                </Button>
+                <div>
+                  <p className="text-sm text-slate-600">
+                    {repo.isDemo
+                      ? 'Generated demo data — it is not connected to GitHub.'
+                      : <>Last synced: {repo.lastSyncedAt
+                        ? new Date(repo.lastSyncedAt).toLocaleDateString()
+                        : 'Never'}{' '}
+                        {repo.lastSyncedAt && 'at'}{' '}
+                        {repo.lastSyncedAt && new Date(repo.lastSyncedAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}</>}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {!repo.isDemo && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => handleSync(repo.id)}
+                      disabled={syncing === repo.id}
+                    >
+                      <RefreshCw className={`w-4 h-4 ${syncing === repo.id ? 'animate-spin' : ''}`} />
+                      {syncing === repo.id ? 'Syncing...' : 'Sync Now'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => handleRemove(repo)}
+                    disabled={removing === repo.id}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {removing === repo.id ? 'Removing...' : 'Remove'}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -244,7 +325,7 @@ export default function RepositoriesPage() {
             </li>
             <li>Grant the token read access to repositories</li>
             <li>Enter your repository owner, name, and token above</li>
-            <li>Click "Sync Now" to fetch pull request data</li>
+            <li>Click &ldquo;Sync Now&rdquo; to fetch pull request data</li>
             <li>
               TokenIQ will generate AI cost estimates based on PR metadata
             </li>

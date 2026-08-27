@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { Sparkles } from 'lucide-react'
 
 interface CostData {
   totalCost: number
@@ -19,6 +20,7 @@ export default function CostBreakdownPage() {
   const [data, setData] = useState<CostData | null>(null)
   const [loading, setLoading] = useState(true)
   const [generatingInsights, setGeneratingInsights] = useState(false)
+  const [insightNotice, setInsightNotice] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/cost').then(res => res.json()).then(d => { setData(d); setLoading(false) }).catch(err => { console.error(err); setLoading(false) })
@@ -29,15 +31,16 @@ export default function CostBreakdownPage() {
 
   const handleGenerateInsights = async () => {
     setGeneratingInsights(true)
+    setInsightNotice(null)
     try {
       const response = await fetch('/api/insights/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 10 }) })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Insight generation failed')
-      alert(result.message)
+      setInsightNotice(result.message)
       const refreshed = await fetch('/api/cost').then(res => res.json())
       setData(refreshed)
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Insight generation failed')
+      setInsightNotice(error instanceof Error ? error.message : 'Insight generation failed')
     } finally {
       setGeneratingInsights(false)
     }
@@ -45,15 +48,29 @@ export default function CostBreakdownPage() {
 
   return (
     <div className="p-8 space-y-8">
-      <div className="flex items-start justify-between gap-4">
+      <div>
         <div>
           <h1 className="text-3xl font-bold">Cost Breakdown</h1>
-          <p className="text-slate-600 mt-1">AI costs across different dimensions</p>
+          <p className="text-slate-600 mt-1">Measure spend, then turn the highest-impact PRs into action.</p>
         </div>
-        <Button onClick={handleGenerateInsights} disabled={generatingInsights}>
-          {generatingInsights ? 'Generating…' : 'Generate insights'}
-        </Button>
       </div>
+
+      <Card className="overflow-hidden border-indigo-200 bg-gradient-to-r from-indigo-50 via-white to-cyan-50 shadow-sm">
+        <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-200"><Sparkles className="h-5 w-5" /></div>
+            <div>
+              <p className="text-lg font-semibold text-slate-950">Generate AI cost insights</p>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Analyze your most recent unreviewed PRs to explain cost drivers, efficiency, and the next action to take. Generates up to 10 insights at a time.</p>
+              {insightNotice && <p className="mt-3 text-sm font-medium text-indigo-700">{insightNotice}</p>}
+            </div>
+          </div>
+          <Button size="lg" className="shrink-0 gap-2 bg-indigo-600 px-5 text-white hover:bg-indigo-700" onClick={handleGenerateInsights} disabled={generatingInsights}>
+            <Sparkles className={`h-4 w-4 ${generatingInsights ? 'animate-pulse' : ''}`} />
+            {generatingInsights ? 'Generating insights…' : 'Generate insights'}
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-2">

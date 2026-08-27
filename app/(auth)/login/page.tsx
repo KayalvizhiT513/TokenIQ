@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TokenIQMark } from '@/components/brand/TokenIQMark'
@@ -107,6 +108,8 @@ export default function LoginPage() {
               {isLoading ? 'Signing you in…' : <>Continue to workspace <ArrowRight className="ml-1 h-4 w-4" /></>}
             </Button>
           </form>
+
+          <p className="mt-5 text-center text-sm text-slate-600">New to TokenIQ? <Link href="/register" className="font-medium text-indigo-600 hover:underline">Create an account</Link></p>
 
           <div className="mt-7 flex gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3.5 text-xs leading-5 text-slate-600">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />

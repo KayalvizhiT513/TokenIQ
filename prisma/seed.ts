@@ -34,6 +34,14 @@ async function main() {
     },
   })
 
+  const modelConfigs = await Promise.all([
+    ['openai', 'gpt-4o-mini', 0.15, 0.6, 0.075, true],
+    ['openai', 'gpt-4o', 2.5, 10, 1.25, false],
+    ['anthropic', 'claude-3-5-sonnet', 3, 15, 0.3, false],
+  ].map(([provider, model, inputCostPerMillion, outputCostPerMillion, cachedCostPerMillion, isDefault]) => prisma.modelConfig.create({
+    data: { orgId: org.id, provider: provider as string, model: model as string, inputCostPerMillion: inputCostPerMillion as number, outputCostPerMillion: outputCostPerMillion as number, cachedCostPerMillion: cachedCostPerMillion as number, isDefault: isDefault as boolean },
+  })))
+
   // Create repository (demo, no PAT)
   const repo = await prisma.repository.create({
     data: {
@@ -41,13 +49,14 @@ async function main() {
       owner: 'anthropics',
       name: 'anthropic-sdk-python',
       encryptedPat: '', // not actually used in seed
+      modelConfigId: modelConfigs[0].id,
     },
   })
 
   // Generate 200 synthetic PRs with realistic distribution
   const pullRequests = generateSyntheticPRs(200)
 
-  for (const prData of pullRequests) {
+  for (const [index, prData] of pullRequests.entries()) {
     const pr = await prisma.pullRequest.create({
       data: {
         repositoryId: repo.id,
@@ -56,7 +65,7 @@ async function main() {
     })
 
     // Generate usage from PR metadata
-    const usage = deriveUsage(pr)
+    const usage = deriveUsage(pr, modelConfigs[index % modelConfigs.length])
 
     await prisma.usageRecord.create({
       data: {

@@ -70,3 +70,10 @@ export const authConfig: AuthOptions = {
 }
 
 export const auth = () => getServerSession(authConfig)
+
+export async function currentUser() {
+  const session = await auth()
+  const userId = (session?.user as { id?: string } | undefined)?.id
+  if (!userId) return null
+  return prisma.user.findUnique({ where: { id: userId } })
+}
