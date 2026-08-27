@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE "UsageRecord" ADD COLUMN "actualCostUsd" REAL;
+ALTER TABLE "UsageRecord" ADD COLUMN "actualCostUsd" DOUBLE PRECISION;
 ALTER TABLE "UsageRecord" ADD COLUMN "actualInputTokens" INTEGER;
 ALTER TABLE "UsageRecord" ADD COLUMN "actualOutputTokens" INTEGER;
 
@@ -9,10 +9,10 @@ CREATE TABLE "Integration" (
     "orgId" TEXT NOT NULL,
     "provider" TEXT NOT NULL,
     "encryptedApiKey" TEXT NOT NULL,
-    "lastVerifiedAt" DATETIME,
+    "lastVerifiedAt" TIMESTAMP(3),
     "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "Integration_orgId_fkey" FOREIGN KEY ("orgId") REFERENCES "Organization" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 

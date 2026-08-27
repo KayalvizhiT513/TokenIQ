@@ -1,4 +1,4 @@
-ALTER TABLE "Integration" ADD COLUMN "lastSyncedAt" DATETIME;
+ALTER TABLE "Integration" ADD COLUMN "lastSyncedAt" TIMESTAMP(3);
 ALTER TABLE "Integration" ADD COLUMN "lastSyncError" TEXT;
 
 CREATE TABLE "UsageEvent" (
@@ -12,17 +12,17 @@ CREATE TABLE "UsageEvent" (
     "traceId" TEXT,
     "spanId" TEXT,
     "sourceEventId" TEXT,
-    "startedAt" DATETIME NOT NULL,
-    "endedAt" DATETIME,
+    "startedAt" TIMESTAMP(3) NOT NULL,
+    "endedAt" TIMESTAMP(3),
     "latencyMs" INTEGER,
     "inputTokens" INTEGER NOT NULL DEFAULT 0,
     "outputTokens" INTEGER NOT NULL DEFAULT 0,
     "cachedTokens" INTEGER NOT NULL DEFAULT 0,
     "totalTokens" INTEGER NOT NULL DEFAULT 0,
-    "costUsd" REAL,
+    "costUsd" DOUBLE PRECISION,
     "statusCode" INTEGER,
     "metadata" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "UsageEvent_orgId_fkey" FOREIGN KEY ("orgId") REFERENCES "Organization" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "UsageEvent_integrationId_fkey" FOREIGN KEY ("integrationId") REFERENCES "Integration" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
