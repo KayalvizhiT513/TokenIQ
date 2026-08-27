@@ -1,8 +1,10 @@
 import { prisma } from '@/lib/db'
+import { usageRecordVisibilityFilter } from '@/lib/demo-data'
 
 export async function GET() {
   try {
     const usageRecords = await prisma.usageRecord.findMany({
+      where: usageRecordVisibilityFilter,
       include: { pullRequest: true },
       orderBy: { generatedAt: 'desc' },
     })

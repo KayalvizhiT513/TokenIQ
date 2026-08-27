@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface CostData {
@@ -17,6 +18,7 @@ interface CostData {
 export default function CostBreakdownPage() {
   const [data, setData] = useState<CostData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [generatingInsights, setGeneratingInsights] = useState(false)
 
   useEffect(() => {
     fetch('/api/cost').then(res => res.json()).then(d => { setData(d); setLoading(false) }).catch(err => { console.error(err); setLoading(false) })
@@ -25,11 +27,32 @@ export default function CostBreakdownPage() {
   if (loading) return <div className="p-8 text-center text-slate-600">Loading...</div>
   if (!data) return <div className="p-8 text-center text-slate-600">Failed to load</div>
 
+  const handleGenerateInsights = async () => {
+    setGeneratingInsights(true)
+    try {
+      const response = await fetch('/api/insights/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: 10 }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Insight generation failed')
+      alert(result.message)
+      const refreshed = await fetch('/api/cost').then(res => res.json())
+      setData(refreshed)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Insight generation failed')
+    } finally {
+      setGeneratingInsights(false)
+    }
+  }
+
   return (
     <div className="p-8 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Cost Breakdown</h1>
-        <p className="text-slate-600 mt-1">AI costs across different dimensions</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Cost Breakdown</h1>
+          <p className="text-slate-600 mt-1">AI costs across different dimensions</p>
+        </div>
+        <Button onClick={handleGenerateInsights} disabled={generatingInsights}>
+          {generatingInsights ? 'Generating…' : 'Generate insights'}
+        </Button>
       </div>
 
       <Card>

@@ -2,7 +2,6 @@ import { prisma } from '@/lib/db'
 import { decrypt } from '@/lib/crypto'
 import { fetchPullRequests } from '@/lib/github'
 import { deriveUsage } from '@/lib/generator'
-import { fetchOpenAIUsage, estimateActualCost } from '@/lib/openai'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -52,56 +51,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Check if there's an OpenAI integration for this org
-    let openaiApiKey: string | null = null
-    let openaiUsageData: any = null
-
-    try {
-      const integration = await prisma.integration.findUnique({
-        where: { orgId_provider: { orgId: repo.orgId, provider: 'openai' } },
-      })
-
-      if (integration) {
-        openaiApiKey = decrypt(integration.encryptedApiKey)
-
-        // Fetch OpenAI usage data for the date range of these PRs
-        if (pullRequests.length > 0) {
-          const mergedPrs = pullRequests.filter(pr => pr.mergedAt)
-          console.log(`Found ${mergedPrs.length} merged PRs out of ${pullRequests.length}`)
-
-          const dates = mergedPrs.map(pr => pr.mergedAt!.getTime())
-
-          if (dates.length > 0) {
-            const minDate = new Date(Math.min(...dates))
-            const maxDate = new Date(Math.max(...dates))
-
-            // Fetch usage for a wider range (7 days before to 7 days after)
-            const startDate = new Date(minDate)
-            startDate.setDate(startDate.getDate() - 7)
-            const endDate = new Date(maxDate)
-            endDate.setDate(endDate.getDate() + 7)
-
-            console.log(`Fetching OpenAI usage from ${startDate.toISOString()} to ${endDate.toISOString()}`)
-            openaiUsageData = await fetchOpenAIUsage(openaiApiKey, startDate, endDate)
-            console.log('OpenAI usage data:', openaiUsageData ? `success - ${openaiUsageData.data?.length || 0} records` : 'failed')
-          } else {
-            console.log('No merged PRs found - skipping OpenAI usage fetch')
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch OpenAI data:', err)
-      // Continue without actual costs
-    }
-
-    // Calculate total estimated tokens for proportional allocation
-    let totalEstimatedTokens = 0
+    // PR estimates are deliberately kept separate from actual provider telemetry.
     const estimatedUsages = pullRequests.map(pr => {
       const usage = deriveUsage({
         linesAdded: pr.linesAdded,
         linesDeleted: pr.linesDeleted,
       })
-      totalEstimatedTokens += usage.inputTokens + usage.outputTokens
       return usage
     })
 
@@ -147,19 +102,6 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      // Calculate actual costs if OpenAI data is available
-      let actualCostData: { actualCost: number; actualTokens: number } | null = null
-      if (openaiUsageData) {
-        const prTotalEstimatedTokens = usage.inputTokens + usage.outputTokens
-        actualCostData = estimateActualCost(
-          usage.inputTokens,
-          usage.outputTokens,
-          openaiUsageData,
-          totalEstimatedTokens,
-          prTotalEstimatedTokens
-        )
-      }
-
       // Upsert usage record
       const existingUsage = await prisma.usageRecord.findUnique({
         where: { pullRequestId: dbPr.id },
@@ -172,9 +114,9 @@ export async function POST(req: NextRequest) {
         outputTokens: usage.outputTokens,
         cachedInputTokens: usage.cachedInputTokens,
         costUsd: usage.costUsd,
-        actualCostUsd: actualCostData?.actualCost || null,
-        actualInputTokens: actualCostData?.actualTokens ? Math.round(actualCostData.actualTokens * 0.75) : null,
-        actualOutputTokens: actualCostData?.actualTokens ? Math.round(actualCostData.actualTokens * 0.25) : null,
+        actualCostUsd: null,
+        actualInputTokens: null,
+        actualOutputTokens: null,
       }
 
       if (existingUsage) {
@@ -202,11 +144,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Synced ${createdCount} new PRs and updated ${updatedCount} existing PRs${openaiUsageData ? ' with actual cost data' : ''}`,
+      message: `Synced ${createdCount} new PRs and updated ${updatedCount} existing PRs. Provider telemetry is collected independently.`,
       prCount: pullRequests.length,
       createdCount,
       updatedCount,
-      withActualCosts: !!openaiUsageData,
+      withActualCosts: false,
     })
   } catch (error) {
     console.error('Sync error:', error)

@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Plus, RefreshCw } from 'lucide-react'
 
@@ -134,12 +133,13 @@ export default function RepositoriesPage() {
           </p>
         </div>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Connect Repository
-            </Button>
-          </DialogTrigger>
+          <button
+            onClick={() => setIsOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Connect Repository
+          </button>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Connect GitHub Repository</DialogTitle>

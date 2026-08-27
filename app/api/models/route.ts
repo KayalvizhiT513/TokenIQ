@@ -1,8 +1,11 @@
 import { prisma } from '@/lib/db'
+import { usageRecordVisibilityFilter } from '@/lib/demo-data'
 
 export async function GET() {
   try {
+    const usageEvents = await prisma.usageEvent.findMany()
     const usageRecords = await prisma.usageRecord.findMany({
+      where: usageRecordVisibilityFilter,
       include: { pullRequest: true },
     })
 
@@ -60,6 +63,16 @@ export async function GET() {
       .filter((a) => a.total > 0)
       .sort((a, b) => b.gpt4Count - a.gpt4Count)
 
+    const telemetryModels: Record<string, { provider: string; model: string; version: string | null; requests: number; tokens: number; totalCost: number; latencyTotal: number; latencyCount: number }> = {}
+    usageEvents.forEach(event => {
+      const key = `${event.provider}:${event.model}:${event.modelVersion ?? ''}`
+      const stat = telemetryModels[key] ?? { provider: event.provider, model: event.model, version: event.modelVersion, requests: 0, tokens: 0, totalCost: 0, latencyTotal: 0, latencyCount: 0 }
+      stat.requests++
+      stat.tokens += event.totalTokens
+      stat.totalCost += event.costUsd ?? 0
+      if (event.latencyMs !== null) { stat.latencyTotal += event.latencyMs; stat.latencyCount++ }
+      telemetryModels[key] = stat
+    })
     return Response.json({
       modelStats: Object.entries(modelStats).map(([model, stats]) => ({
         model,
@@ -68,6 +81,10 @@ export async function GET() {
       costPieData,
       countPieData,
       authorGpt4Usage: authorGpt4Usage.slice(0, 10),
+      telemetryModels: Object.values(telemetryModels).map(stat => ({
+        ...stat,
+        avgLatencyMs: stat.latencyCount ? Math.round(stat.latencyTotal / stat.latencyCount) : null,
+      })),
     })
   } catch (error) {
     console.error('Models API error:', error)
