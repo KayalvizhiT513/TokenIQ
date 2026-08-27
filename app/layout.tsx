@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TokenIQ - AI ROI Intelligence",
-  description: "Unified intelligence layer for enterprise AI adoption and cost tracking",
+  title: "TokenIQ | AI Platform Observability",
+  description: "AI platform observability for usage, cost, latency, and model analysis",
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({

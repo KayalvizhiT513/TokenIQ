@@ -11,6 +11,7 @@ interface ModelData {
   costPieData: any[]
   countPieData: any[]
   authorGpt4Usage: any[]
+  telemetryModels: any[]
 }
 
 const COLORS = ['#2563eb', '#10b981']
@@ -29,9 +30,30 @@ export default function ModelDistributionPage() {
   return (
     <div className="p-8 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Model Distribution</h1>
-        <p className="text-slate-600">Which AI models are being used and costs</p>
+        <h1 className="text-3xl font-bold">Model Analysis</h1>
+        <p className="text-slate-600">Actual request usage, versions, cost, tokens, and latency</p>
       </div>
+
+      {data.telemetryModels.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>Observed Provider Usage</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Model / version</TableHead><TableHead className="text-right">Requests</TableHead><TableHead className="text-right">Tokens</TableHead><TableHead className="text-right">Latency</TableHead><TableHead className="text-right">Cost</TableHead></TableRow></TableHeader>
+              <TableBody>{data.telemetryModels.map((stat: any) => (
+                <TableRow key={`${stat.provider}-${stat.model}-${stat.version}`}>
+                  <TableCell><Badge variant="outline" className="capitalize">{stat.provider}</Badge></TableCell>
+                  <TableCell>{stat.model}{stat.version ? <span className="text-slate-500"> · {stat.version}</span> : null}</TableCell>
+                  <TableCell className="text-right">{stat.requests.toLocaleString()}</TableCell>
+                  <TableCell className="text-right font-mono">{stat.tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{stat.avgLatencyMs === null ? '—' : `${stat.avgLatencyMs} ms`}</TableCell>
+                  <TableCell className="text-right font-mono">${stat.totalCost.toFixed(4)}</TableCell>
+                </TableRow>
+              ))}</TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {data.modelStats.map((stat: any) => (

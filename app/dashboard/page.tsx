@@ -25,6 +25,7 @@ interface DashboardData {
   topExpensivePrs: any[]
   costTrendData: any[]
   modelChartData: any[]
+  telemetry: { requests: number; tokens: number; costUsd: number; avgLatencyMs: number | null }
 }
 
 const COLORS = ['#2563eb', '#10b981']
@@ -101,16 +102,13 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">
-              GPT-4o PRs
+              Actual Requests
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{data.modelCounts['gpt-4o'] || 0}</div>
+            <div className="text-3xl font-bold">{data.telemetry.requests.toLocaleString()}</div>
             <p className="text-xs text-slate-600 mt-1">
-              {data.prCount > 0
-                ? Math.round(((data.modelCounts['gpt-4o'] || 0) / data.prCount) * 100)
-                : 0}
-              %
+              {data.telemetry.tokens.toLocaleString()} tokens
             </p>
           </CardContent>
         </Card>
@@ -118,18 +116,13 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-600">
-              GPT-4o-mini PRs
+              Avg Request Latency
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
-              {data.modelCounts['gpt-4o-mini'] || 0}
-            </div>
+            <div className="text-3xl font-bold">{data.telemetry.avgLatencyMs ?? '—'}{data.telemetry.avgLatencyMs !== null ? ' ms' : ''}</div>
             <p className="text-xs text-slate-600 mt-1">
-              {data.prCount > 0
-                ? Math.round(((data.modelCounts['gpt-4o-mini'] || 0) / data.prCount) * 100)
-                : 0}
-              %
+              Actual usage from connected collectors
             </p>
           </CardContent>
         </Card>

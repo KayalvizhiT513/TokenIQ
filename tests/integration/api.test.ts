@@ -163,4 +163,27 @@ describe('API Integration Tests', () => {
     const totalCost = records.reduce((sum, r) => sum + r.costUsd, 0)
     expect(totalCost).toBeGreaterThan(0)
   })
+
+  it('stores request-level usage telemetry with provider attribution and tracing', async () => {
+    const event = await prisma.usageEvent.create({
+      data: {
+        orgId,
+        provider: 'local',
+        model: 'llama-3.1',
+        modelVersion: '8b-instruct',
+        requestId: 'request-1',
+        traceId: 'trace-1',
+        spanId: 'span-1',
+        sourceEventId: 'local-request-1',
+        startedAt: new Date(),
+        latencyMs: 128,
+        inputTokens: 120,
+        outputTokens: 36,
+        totalTokens: 156,
+        statusCode: 200,
+      },
+    })
+    expect(event.traceId).toBe('trace-1')
+    expect(event.totalTokens).toBe(156)
+  })
 })

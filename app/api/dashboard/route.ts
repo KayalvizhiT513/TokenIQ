@@ -1,8 +1,11 @@
 import { prisma } from '@/lib/db'
+import { usageRecordVisibilityFilter } from '@/lib/demo-data'
 
 export async function GET() {
   try {
+    const usageEvents = await prisma.usageEvent.findMany({ orderBy: { startedAt: 'desc' } })
     const usageRecords = await prisma.usageRecord.findMany({
+      where: usageRecordVisibilityFilter,
       include: {
         pullRequest: {
           include: {
@@ -63,6 +66,14 @@ export async function GET() {
         'gpt-4o-mini': Math.round((models['gpt-4o-mini'] || 0) * 100) / 100,
       }))
 
+    const telemetry = usageEvents.reduce((acc, event) => ({
+      requests: acc.requests + 1,
+      tokens: acc.tokens + event.totalTokens,
+      latencyTotal: acc.latencyTotal + (event.latencyMs ?? 0),
+      latencyCount: acc.latencyCount + (event.latencyMs === null ? 0 : 1),
+      costUsd: acc.costUsd + (event.costUsd ?? 0),
+    }), { requests: 0, tokens: 0, latencyTotal: 0, latencyCount: 0, costUsd: 0 })
+
     return Response.json({
       totalCost,
       prCount,
@@ -77,6 +88,10 @@ export async function GET() {
       })),
       costTrendData,
       modelChartData,
+      telemetry: {
+        ...telemetry,
+        avgLatencyMs: telemetry.latencyCount ? Math.round(telemetry.latencyTotal / telemetry.latencyCount) : null,
+      },
     })
   } catch (error) {
     console.error('Dashboard API error:', error)

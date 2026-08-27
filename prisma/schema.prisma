@@ -18,6 +18,7 @@ model Organization {
   users        User[]
   repositories Repository[]
   integrations Integration[]
+  usageEvents  UsageEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -87,12 +88,49 @@ model Integration {
   encryptedApiKey  String // AES-256-GCM encrypted
 
   lastVerifiedAt   DateTime?
+  lastSyncedAt     DateTime?
+  lastSyncError    String?
   isActive         Boolean @default(true)
+  usageEvents      UsageEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([orgId, provider])
+}
+
+/// A normalized, request-level event received from a provider collector or SDK.
+/// Unlike UsageRecord (a PR estimate), these rows are actual platform telemetry.
+model UsageEvent {
+  id             String   @id @default(cuid())
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  integrationId  String?
+  integration    Integration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  provider       String
+  model          String
+  modelVersion   String?
+  requestId      String?
+  traceId        String?
+  spanId         String?
+  sourceEventId  String?
+  startedAt      DateTime
+  endedAt        DateTime?
+  latencyMs      Int?
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  cachedTokens   Int      @default(0)
+  totalTokens    Int      @default(0)
+  costUsd        Float?
+  statusCode     Int?
+  metadata       String?
+  createdAt      DateTime @default(now())
+
+  @@unique([orgId, sourceEventId])
+  @@index([orgId, startedAt])
+  @@index([orgId, provider, model])
+  @@index([orgId, traceId])
 }
 
 model UsageRecord {
@@ -114,6 +152,7 @@ model UsageRecord {
 
   // Insights
   insights           String?  // AI-generated summary of model effectiveness
+  isSynthetic        Boolean  @default(false) // Seeded demo estimate, not live repository data
 
   generatedAt DateTime @default(now())
   createdAt   DateTime @default(now())

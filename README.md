@@ -1,11 +1,12 @@
 # TokenIQ — AI ROI Intelligence Platform
 
-**Attribution of AI spending per PR. Multi-model cost analytics. LLM-powered insights.**
+**AI platform observability for provider/model usage, tokens, latency, cost, and request traces.**
 
 ## 🎯 Problem Statement
 
-Teams use AI coding assistants (ChatGPT, Claude, GitHub Copilot) but **don't know:**
-- How much each PR costs to analyze
+Teams use OpenAI, Anthropic, and local LLMs but **don't know:**
+- Which provider, model version, and request generated a cost
+- Token consumption, latency, and failures across their AI platform
 - Which AI models are most efficient for different code patterns
 - Whether their estimation formulas match real OpenAI/Anthropic spending
 - If specific models are overspending on certain PR types
@@ -14,17 +15,18 @@ Result: Blind AI budgets. No ROI visibility. Impossible to optimize spending.
 
 ## 💡 Solution
 
-**TokenIQ** connects GitHub PR metadata with AI token/cost analytics to:
+**TokenIQ** collects actual usage events alongside GitHub PR estimates to:
 
 1. **Estimate AI costs** from PR size (lines changed, files affected)
 2. **Support multiple providers** (OpenAI, Anthropic, GitHub Copilot)
-3. **Compare estimated vs actual costs** — validate your cost formulas against real API usage
+3. **Ingest actual API usage** — OpenAI organization buckets or request-level events from Anthropic/local collectors
 4. **Generate AI insights** — LLM analyzes each PR to explain model efficiency and cost variance
 5. **Track cost trends** — see where AI spending creates value
 
 ### Key Features
 
-- **📊 Cost Breakdown** — By PR size, model, provider, and over time
+- **📊 Metrics API** — Request counts, input/output/cached tokens, latency, errors, and cost
+- **🧭 Request Tracing** — Request, trace, and span identifiers retained with provider/model attribution
 - **🔍 Cost Verification** — Compare estimated costs (from formula) vs actual costs (from API)
 - **🤖 AI-Generated Insights** — OpenAI analyzes each PR: *"gpt-4o-mini efficiently handled 42-line PR, 15% cheaper than estimated"*
 - **📈 Model Performance Analysis** — Which models work best for small/medium/large PRs?
@@ -59,9 +61,9 @@ npm run dev
 - Password: `demo123`
 
 ### 4. View Demo Data
-200+ PRs with:
+200+ seeded PR estimates with:
 - ✅ Estimated costs (formula-based)
-- ✅ Actual costs (synthetic OpenAI data)
+- ✅ A real telemetry collector ready for provider events
 - ✅ AI-generated insights
 - ✅ Cost variance analysis (+30%, +1650%, etc.)
 
@@ -104,8 +106,48 @@ npm run dev
 
 ### Architecture
 ```
-GitHub PR Data → Estimate Costs (formula) → Compare with Actual (API) → Generate Insights (LLM)
+OpenAI ─────┐
+Anthropic ──┼──► Usage Collector ──► Usage Metadata ──► Metrics API
+Local LLM ──┘                              │                │
+                                          Cost / Tokens / Latency
+                                                           │
+                                             Dashboard + Model Analysis
 ```
+
+### Actual usage ingestion
+
+`POST /api/usage/sync` fetches real OpenAI organization completion usage into durable, idempotent usage events. It requires an OpenAI **Admin API key** and is available from the Integrations page.
+
+For Anthropic, local models, gateways, or application SDK instrumentation, send normalized request events to `POST /api/usage/ingest`:
+
+```json
+{
+  "events": [{
+    "provider": "anthropic",
+    "model": "claude-sonnet-4",
+    "modelVersion": "2026-01-01",
+    "requestId": "req_123",
+    "traceId": "trace_abc",
+    "spanId": "span_01",
+    "sourceEventId": "gateway-req_123",
+    "startedAt": "2026-08-27T10:00:00Z",
+    "latencyMs": 842,
+    "inputTokens": 1250,
+    "outputTokens": 320,
+    "cachedTokens": 400,
+    "costUsd": 0.0098,
+    "statusCode": 200
+  }]
+}
+```
+
+`sourceEventId` makes retries idempotent. The Metrics API (`GET /api/metrics?days=30`) exposes aggregated provider/model/version metrics, recent events, and trace groups. OpenAI's organization endpoint is aggregate usage, so it cannot supply individual request IDs or latency; SDK/gateway events provide that request-level visibility.
+
+### Hiding demo data
+
+Set `SHOW_SYNTHETIC_DATA=false` in `.env.local` and restart the server to remove seeded PR estimates from the Dashboard, PR Analytics, Cost, Cost Verification, and Model Analysis pages. Actual collector events remain visible.
+
+Use **Generate insights** on Cost Breakdown to generate up to ten concise OpenAI insights for unprocessed live PR estimates at a time. This uses the connected OpenAI inference key; an OpenAI Admin key used for organization usage sync does not itself grant model-inference access.
 
 ### Multi-Provider Support
 ```typescript
@@ -153,7 +195,8 @@ The demo uses proportional allocation from OpenAI's aggregate usage. Real-world 
 ## 🔮 Future Enhancements
 
 - [ ] Live GitHub integration (currently reads existing PR data)
-- [ ] Real-time OpenAI usage sync
+- [x] OpenAI organization usage sync
+- [x] Provider-agnostic request event ingestion
 - [ ] Cost forecasting / budgeting
 - [ ] Slack alerts for overspending
 - [ ] Custom cost formulas per team

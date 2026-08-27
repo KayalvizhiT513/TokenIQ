@@ -66,6 +66,7 @@ async function main() {
         outputTokens: usage.outputTokens,
         cachedInputTokens: usage.cachedInputTokens,
         costUsd: usage.costUsd,
+        isSynthetic: true,
       },
     })
   }

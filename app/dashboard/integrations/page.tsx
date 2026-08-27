@@ -19,6 +19,8 @@ interface Integration {
   provider: string
   isActive: boolean
   lastVerifiedAt: string | null
+  lastSyncedAt: string | null
+  lastSyncError: string | null
 }
 
 export default function IntegrationsPage() {
@@ -28,6 +30,7 @@ export default function IntegrationsPage() {
   const [apiKey, setApiKey] = useState('')
   const [saving, setSaving] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState('openai')
+  const [syncingId, setSyncingId] = useState<string | null>(null)
 
   useEffect(() => {
     loadIntegrations()
@@ -47,7 +50,7 @@ export default function IntegrationsPage() {
   }
 
   const handleSave = async () => {
-    if (!apiKey) {
+    if (!apiKey && selectedProvider !== 'local') {
       alert('Please enter an API key')
       return
     }
@@ -72,6 +75,8 @@ export default function IntegrationsPage() {
             provider: result.provider,
             isActive: result.isActive,
             lastVerifiedAt: result.lastVerifiedAt,
+            lastSyncedAt: result.lastSyncedAt,
+            lastSyncError: null,
           },
         ])
         setApiKey('')
@@ -87,6 +92,19 @@ export default function IntegrationsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSync = async (integration: Integration) => {
+    setSyncingId(integration.id)
+    try {
+      const res = await fetch('/api/usage/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ integrationId: integration.id }) })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Sync failed')
+      alert(`Collected ${result.events} OpenAI usage buckets.`)
+      await loadIntegrations()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Usage sync failed')
+    } finally { setSyncingId(null) }
   }
 
   const handleDelete = async (integrationId: string) => {
@@ -144,22 +162,21 @@ export default function IntegrationsPage() {
                   className="w-full px-3 py-2 border rounded-md"
                 >
                   <option value="openai">OpenAI</option>
-                  <option value="anthropic" disabled>
-                    Anthropic (Coming soon)
-                  </option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="local">Local LLM / collector</option>
                 </select>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">API Key</label>
+                <label className="text-sm font-medium">API Key {selectedProvider === 'local' ? '(optional)' : ''}</label>
                 <Input
                   type="password"
-                  placeholder="sk-..."
+                  placeholder={selectedProvider === 'local' ? 'Managed collector endpoint' : 'sk-...'}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                 />
                 <p className="text-xs text-slate-600">
-                  Your API key is encrypted and stored securely. Only used to verify costs.
+                  Your API key is encrypted and stored securely. OpenAI direct sync requires an Admin API key.
                 </p>
               </div>
 
@@ -223,6 +240,7 @@ export default function IntegrationsPage() {
                   </div>
                   <div className="flex gap-2">
                     {integration.isActive && <Badge>Active</Badge>}
+                    {integration.provider === 'openai' && <Button variant="outline" size="sm" onClick={() => handleSync(integration)} disabled={syncingId === integration.id}>{syncingId === integration.id ? 'Syncing…' : 'Sync usage'}</Button>}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -233,6 +251,7 @@ export default function IntegrationsPage() {
                   </div>
                 </div>
               </CardHeader>
+              {integration.lastSyncedAt && <CardContent className="pt-0 text-sm text-slate-600">Last usage sync: {new Date(integration.lastSyncedAt).toLocaleString()}</CardContent>}
             </Card>
           ))
         )}
@@ -265,9 +284,10 @@ export default function IntegrationsPage() {
             </li>
           </ul>
           <p className="pt-2">
-            Currently, syncing with GitHub fetches PR metadata and generates estimated costs. When
-            you add an OpenAI integration, the next sync will also fetch actual usage data from
-            OpenAI's API and display both side-by-side.
+            GitHub sync generates PR estimates. Actual provider telemetry is collected separately:
+            OpenAI can be synced from its organization usage API, while Anthropic and local models
+            can send request events to <code>/api/usage/ingest</code> with model, tokens, latency,
+            trace ID, and provider attribution.
           </p>
         </CardContent>
       </Card>

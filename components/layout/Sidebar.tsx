@@ -9,19 +9,19 @@ import {
   Settings,
   LogOut,
   Home,
-  Zap,
   GitPullRequest,
   Sliders,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { TokenIQMark } from '@/components/brand/TokenIQMark'
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: Home },
   { href: '/dashboard/prs', label: 'PR Analytics', icon: GitPullRequest },
   { href: '/dashboard/cost', label: 'Cost Breakdown', icon: DollarSign },
   { href: '/dashboard/cost-comparison', label: 'Cost Verification', icon: DollarSign },
-  { href: '/dashboard/models', label: 'Model Distribution', icon: BarChart3 },
+  { href: '/dashboard/models', label: 'Model Analysis', icon: BarChart3 },
   { href: '/dashboard/repositories', label: 'Repositories', icon: Settings },
   { href: '/dashboard/integrations', label: 'Integrations', icon: Sliders },
 ]
@@ -34,7 +34,7 @@ export default function Sidebar() {
     <aside className="w-64 border-r bg-slate-50 h-screen flex flex-col">
       <div className="p-6 border-b">
         <Link href="/" className="flex items-center gap-2">
-          <Zap className="w-6 h-6 text-blue-600" />
+          <TokenIQMark className="h-7 w-7" />
           <span className="font-bold text-lg">TokenIQ</span>
         </Link>
         <p className="text-xs text-slate-600 mt-1">AI ROI Intelligence</p>
